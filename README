@@ -1,0 +1,70 @@
+1. files included:
+	- README: 	description of overall design and implementation
+	- lab5fs.h: 	header file, which declares basic constants/structs of lab5fs
+	- lab5fs.c: 	implementation of lab5fs file system kernel module
+	- mklab5fs.c:	mkfs utility of lab5fs
+	- Makefile:	Makefile for creating lab5fs.ko and mklab5fs
+
+1. file system on-disk layout (mklab5fs.c)
+-----------------------------------------------
+|	        super block (1 block)          |
+-----------------------------------------------
+|	         data map   (8 blocks)         |
+|                                              |
+-----------------------------------------------
+|	        dentry map (1 block)           |
+-----------------------------------------------
+|	        inode map  (1 block)           |
+-----------------------------------------------
+|	        inode  blocks  (256 blocks)    |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+-----------------------------------------------
+|	    data(dentry) blocks  (32 blocks)   |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+-----------------------------------------------
+|	        data   blocks  (n blocks)      |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+|                                              |
+-----------------------------------------------
+
+1. limitations:
+	- image file size: 		1 MB ~ 16 MB
+	- max number of inodes: 	1024
+	- max number of files:		1024
+	- max file size:		8 KB
+	- block size:			512 B
+	- max file name length:		12 B
+	- data block number:		1749 ~ 32469
+
+
+
+
+
+
+
+
+
+
+
+
+
