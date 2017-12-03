@@ -10,81 +10,184 @@
 #include <asm/bitops.h>
 
 #include "lab5fs.h"
-
+ 
 static void lab5fs_read_inode(struct inode * inode) {
     int ino = (int)inode->i_ino;
-    struct lab5fs_ino *mem_ino,ri;
+    struct lab5fs_ino *di, ri;
     struct buffer_head *bh;
     int block, off;
     
-    printk("lab5fs_read_inode\n");
-    printk("ino = %d\n", ino);
+    printk("lab5fs_read_inode(), ino = %d\n", ino);
     
     if (ino < LAB5FS_ROOT_INO){
-        printk("Bad inode number %s:%08lx\n", inode->i_sb->s_id, ino);
+        printk("Bad inode number\n");
         make_bad_inode(inode);
         return;
     }
     
     block = 1 + 8 + 1 + 1 + ino/LAB5FS_INO_PER_BLOCK; 
-    printk("block:%d\n",block);
     bh = sb_bread(inode->i_sb, block);
     if (!bh) {
-        printk("Unable to read inode %s:%08lx\n", inode->i_sb->s_id, ino);
+        printk("Unable to read inode %d\n", ino);
         make_bad_inode(inode);
         return;
     }
-    printk("ino = %d, ino %% %d = %d %d\n", ino, LAB5FS_INO_PER_BLOCK, ino % LAB5FS_INO_PER_BLOCK, ino % 4);
+    //printk("ino = %d, ino %% %d = %d %d\n", ino, LAB5FS_INO_PER_BLOCK, ino % LAB5FS_INO_PER_BLOCK, ino % 4);
     off = (ino % LAB5FS_INO_PER_BLOCK) * LAB5FS_INODESIZE;
-    printk("off = %d\n", off);
-    printk("total off = 0x%x\n", off+block*LAB5FS_BLOCKSIZE);
-    mem_ino = (struct lab5fs_ino *)(bh->b_data + off);
+    //printk("off = %d\n", off);
+    //printk("total off = 0x%x\n", off+block*LAB5FS_BLOCKSIZE);
+    di = (struct lab5fs_ino *)(bh->b_data + off);
 
-    ri = *mem_ino;
-    printk("i_ino: %d, i_type: %d, i_mode: %x, i_gid: %d, i_nlink: %d, i_blocknum: %d, i_atime: %d\n", ri.i_ino, ri.i_type, ri.i_mode, ri.i_gid, ri.i_nlink, ri.i_blocknum, ri.i_atime);
+    ri = *di;
+    //printk("i_ino: %d, i_type: %d, i_mode: %x, i_gid: %d, i_nlink: %d, i_blocknum: %d, i_atime: %d\n", ri.i_ino, ri.i_type, ri.i_mode, ri.i_gid, ri.i_nlink, ri.i_blocknum, ri.i_atime);
     
-    inode->i_mode = 0x0000ffff & mem_ino->i_mode;
-    if (mem_ino->i_type == LAB5FS_DIR_TYPE) {
+    inode->i_mode = 0x0000ffff & di->i_mode;
+    if (di->i_type == LAB5FS_DIR_TYPE) {
         printk("LAB5FS_DIR_TYPE\n");
         inode->i_mode |= S_IFDIR;
         inode->i_op = &lab5fs_dir_inops;
         inode->i_fop = &lab5fs_dir_operations;
-    } else if (mem_ino->i_type == LAB5FS_REG_TYPE) {
+    } else if (di->i_type == LAB5FS_REG_TYPE) {
         printk("LAB5FS_REG_TYPE\n");
         inode->i_mode |= S_IFREG;
-        //TODO
-//        inode->i_op = &lab5fs_file_inops;
-//        inode->i_fop = &lab5fs_file_operations;
-//        inode->i_mapping->a_ops = &lab5fs_aops;
+        inode->i_op = &lab5fs_file_inops;
+        inode->i_fop = &lab5fs_file_operations;
+        inode->i_mapping->a_ops = &lab5fs_aops;
     }
     else {
         printk("FILE TYPE ERROR!\n");
         goto out;
     }
     
-    
-    inode->i_uid = mem_ino->i_uid;
-    inode->i_gid = mem_ino->i_gid;
-    inode->i_nlink = mem_ino->i_nlink;
-    inode->i_blocks = LAB5FS_FILEBLOCKS(mem_ino);
-    inode->i_size = LAB5FS_FILESIZE(mem_ino);
+    inode->i_uid = di->i_uid;
+    inode->i_gid = di->i_gid;
+    inode->i_nlink = di->i_nlink;
+    inode->i_blocks = LAB5FS_FILEBLOCKS(di);
+    if (ino != LAB5FS_ROOT_INO)
+        inode->i_size = LAB5FS_FILESIZE(di);
+    else
+        inode->i_size = LAB5FS_RI_FILESIZE(di);
+    printk("inode->i_size = %lld\n", inode->i_size);
     inode->i_blksize = PAGE_SIZE;
-    inode->i_atime.tv_sec = mem_ino->i_atime;
-    inode->i_mtime.tv_sec = mem_ino->i_mtime;
-    inode->i_ctime.tv_sec = mem_ino->i_ctime;
+    inode->i_atime.tv_sec = di->i_atime;
+    inode->i_mtime.tv_sec = di->i_mtime;
+    inode->i_ctime.tv_sec = di->i_ctime;
     inode->i_atime.tv_nsec = 0;
     inode->i_mtime.tv_nsec = 0;
     inode->i_ctime.tv_nsec = 0;
-
+    LAB5FS_I(inode)->i_dsk_ino = di->i_ino;
+    LAB5FS_I(inode)->i_endoffset = di->i_endoffset;
+    LAB5FS_I(inode)->i_blocknum = di->i_blocknum;
+    printk("LAB5FS_I(inode)->i_blocknum  = %zu\n", LAB5FS_I(inode)->i_blocknum );
+    
 out:
     brelse(bh);
-
-    printk("read_inode finished, PAGE_SIZE = %lu\n", PAGE_SIZE);
 }
 
+static int lab5fs_write_inode(struct inode * inode, int unused) {
+    int ino_block_index, ino_within_block_index;
+    struct buffer_head *bh_inode_block;
+    struct lab5fs_ino *di;
+    int block;
+    unsigned long ino = inode->i_ino;
+
+    printk("lab5fs_write_inode(), ino = %lu\n", ino);
+    
+    lock_kernel();
+    
+    // read inode from disk
+    block = 1 + 8 + 1 + 1;
+    ino_block_index = ino / LAB5FS_INO_PER_BLOCK;
+    ino_within_block_index = ino % LAB5FS_INO_PER_BLOCK;
+    printk("ino_block_index = %d, ino_within_block_index = %d\n",
+        ino_block_index, ino_within_block_index);
+
+    bh_inode_block = sb_bread(inode->i_sb, block + ino_block_index);
+    if (!bh_inode_block) {
+        printk("Unable to read inode block\n");
+        unlock_kernel();
+        return -EIO;
+    }
+
+    di = (struct lab5fs_ino *) (bh_inode_block->b_data);
+    di += ino_within_block_index;
+
+    if (inode->i_ino == LAB5FS_ROOT_INO)
+        di->i_type = LAB5FS_DIR_TYPE;
+    else
+        di->i_type = LAB5FS_REG_TYPE;
+    
+    di->i_ino = inode->i_ino;
+    di->i_mode = inode->i_mode;
+    di->i_uid = inode->i_uid;
+    di->i_gid = inode->i_gid;
+    di->i_nlink = inode->i_nlink;
+    di->i_atime = inode->i_atime.tv_sec;
+    di->i_mtime = inode->i_mtime.tv_sec;
+    di->i_ctime = inode->i_ctime.tv_sec;
+    di->i_endoffset = LAB5FS_I(inode)->i_endoffset;
+    di->i_blocknum = LAB5FS_I(inode)->i_blocknum;
+
+    printk("di->i_blocknum = %u\n", di->i_blocknum);
+    // flush inode to disk
+    mark_buffer_dirty(bh_inode_block);
+    brelse(bh_inode_block);
+    printk("flush inode to disk\n");
+    unlock_kernel();
+    return 0;
+}
+
+static void lab5fs_put_super(struct super_block *s) {
+    printk("lab5fs_put_super()\n");
+}
+        
+static kmem_cache_t * lab5fs_inode_cachep;
+
+static struct inode *lab5fs_alloc_inode(struct super_block *sb) {
+    struct lab5fs_inode_info *bi;
+    
+    printk("lab5fs_alloc_inode()\n");
+    bi = kmem_cache_alloc(lab5fs_inode_cachep, SLAB_KERNEL);
+    if (!bi)
+        return NULL;
+    return &bi->vfs_inode;
+}
+
+static void lab5fs_destroy_inode(struct inode *inode) {
+    kmem_cache_free(lab5fs_inode_cachep, LAB5FS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags) {
+    struct lab5fs_inode_info *bi = foo;
+    
+    if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+            SLAB_CTOR_CONSTRUCTOR)
+        inode_init_once(&bi->vfs_inode);
+}
+
+static int init_inodecache(void) {
+    printk("init_inodecache()\n");
+    lab5fs_inode_cachep = kmem_cache_create("lab5fs_inode_cache",
+                            sizeof(struct lab5fs_inode_info),
+                            0, SLAB_RECLAIM_ACCOUNT,
+                            init_once, NULL);
+    if (lab5fs_inode_cachep == NULL)
+        return -ENOMEM;
+    return 0;
+}
+
+static void destroy_inodecache(void) {
+    printk("destroy_inodecache()\n");
+    if (kmem_cache_destroy(lab5fs_inode_cachep))
+        printk(KERN_INFO "lab5fs_inode_cache: not all structures were freed\n");
+}
 
 static struct super_operations lab5fs_sops = {
-    .read_inode = lab5fs_read_inode,
+    .alloc_inode    = lab5fs_alloc_inode,
+    .destroy_inode  = lab5fs_destroy_inode,
+    .read_inode     = lab5fs_read_inode,
+    .write_inode    = lab5fs_write_inode,
+    .put_super      = lab5fs_put_super,
 };
 
 static int lab5fs_fill_super(struct super_block *s, void *data, int silent){
@@ -146,23 +249,23 @@ static struct file_system_type lab5fs_fs_type = {
 
 int lab5fs_init (void) {
     int err;
-    printk(KERN_INFO "lab5fs_init()\n");
+    
+    printk("lab5fs_init()\n");
+    init_inodecache();
     
     err = register_filesystem(&lab5fs_fs_type);
-    if (err){
+    if (err) {
         printk("register error\n");
         return err;
     }
-    
     printk("register successfully\n");
-    
     return 0;
 }
 
 void lab5fs_exit(void) {
     printk(KERN_INFO "lab5fs_exit()\n");
-    
     unregister_filesystem(&lab5fs_fs_type);
+    destroy_inodecache();
 }
 
 MODULE_LICENSE("GPL");   

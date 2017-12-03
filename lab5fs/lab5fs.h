@@ -1,3 +1,5 @@
+#include <linux/list.h>
+
 #define DEBUG
 
 #ifdef DEBUG
@@ -83,8 +85,25 @@ struct lab5fs_dentrymap{
     char map[LAB5FS_BLOCKSIZE]; //1 block
 };
 
+/*
+ * lab5fs file system in-core inode info
+ */
+#ifdef __KERNEL__
+struct lab5fs_inode_info {
+    unsigned long i_dsk_ino;
+    uint32_t i_endoffset;
+    uint32_t i_blocknum;
+    struct inode vfs_inode;
+};
+
+static inline struct lab5fs_inode_info *LAB5FS_I(struct inode *inode) {
+    return list_entry(inode, struct lab5fs_inode_info, vfs_inode);
+}
+#endif
+
 #define LAB5FS_FILEBLOCKS(ino) (ino->i_blocknum)
 #define LAB5FS_FILESIZE(ino) (ino->i_blocknum == 0? 0 : (ino->i_blocknum-1)*LAB5FS_BLOCKSIZE + ino->i_endoffset + 1)
+#define LAB5FS_RI_FILESIZE(ino) (ino->i_blocknum == 0? 0 : ino->i_blocknum*LAB5FS_DENTRYSIZE)
 
 /* file.c */
 extern struct inode_operations lab5fs_file_inops;

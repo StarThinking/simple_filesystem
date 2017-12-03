@@ -139,7 +139,7 @@ int main(int argc, char **argv){
         ri.i_mode = S_IFDIR | 0755;
         ri.i_uid = ri.i_gid = 1;
         ri.i_nlink = 2;
-        ri.i_blocknum = 1;
+        ri.i_blocknum = 2;
         time(&now);
         ri.i_atime = ri.i_mtime = ri.i_ctime = now;
         printf("i_ino: %d, i_type: %d, i_mode: %x, i_gid: %d, i_nlink: %d, i_blocknum: %d, i_atime: %d\n", ri.i_ino, ri.i_type, ri.i_mode, ri.i_gid, ri.i_nlink, ri.i_blocknum, ri.i_atime);
