@@ -87,7 +87,9 @@ struct lab5fs_dentrymap{
 #define LAB5FS_FILESIZE(ino) (ino->i_blocknum == 0? 0 : (ino->i_blocknum-1)*LAB5FS_BLOCKSIZE + ino->i_endoffset + 1)
 
 /* file.c */
-//extern struct inode_operations lab5fs_file_inops;
+extern struct inode_operations lab5fs_file_inops;
+extern struct file_operations lab5fs_file_operations;
+extern struct address_space_operations lab5fs_aops;
 
 /* dir.c */
 extern struct inode_operations lab5fs_dir_inops;

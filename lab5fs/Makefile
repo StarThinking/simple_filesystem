@@ -1,6 +1,6 @@
 ifneq ($(KERNELRELEASE),) 
 obj-m := lab5fs.o
-lab5fs-objs := inode.o dir.o
+lab5fs-objs := inode.o dir.o file.o
 else 
 
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build 
