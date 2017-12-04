@@ -66,7 +66,7 @@ static void lab5fs_read_inode(struct inode * inode) {
     if (ino != LAB5FS_ROOT_INO)
         inode->i_size = LAB5FS_FILESIZE(di);
     else
-        inode->i_size = LAB5FS_RI_FILESIZE(di); // di->blocknum * 32
+        inode->i_size = 4096; // for . 
     printk("inode->i_size = %lld\n", inode->i_size);
     inode->i_blksize = PAGE_SIZE;
     inode->i_atime.tv_sec = di->i_atime;
@@ -77,8 +77,8 @@ static void lab5fs_read_inode(struct inode * inode) {
     inode->i_ctime.tv_nsec = 0;
     LAB5FS_I(inode)->i_dsk_ino = di->i_ino;
     LAB5FS_I(inode)->i_endoffset = di->i_endoffset;
-    LAB5FS_I(inode)->i_blocknum = di->i_blocknum;
-    printk("LAB5FS_I(inode)->i_blocknum  = %zu\n", LAB5FS_I(inode)->i_blocknum );
+    inode->i_blocks = di->i_blocknum;
+    printk("inode->i_blocks = %zu\n", inode->i_blocks);
     
 out:
     brelse(bh);
@@ -126,7 +126,7 @@ static int lab5fs_write_inode(struct inode * inode, int unused) {
     di->i_mtime = inode->i_mtime.tv_sec;
     di->i_ctime = inode->i_ctime.tv_sec;
     di->i_endoffset = LAB5FS_I(inode)->i_endoffset;
-    di->i_blocknum = LAB5FS_I(inode)->i_blocknum;
+    di->i_blocknum = inode->i_blocks;
 
     printk("di->i_blocknum = %u\n", di->i_blocknum);
     // flush inode to disk
