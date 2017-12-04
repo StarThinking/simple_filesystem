@@ -66,7 +66,7 @@ static void lab5fs_read_inode(struct inode * inode) {
     if (ino != LAB5FS_ROOT_INO)
         inode->i_size = LAB5FS_FILESIZE(di);
     else
-        inode->i_size = LAB5FS_RI_FILESIZE(di);
+        inode->i_size = LAB5FS_RI_FILESIZE(di); // di->blocknum * 32
     printk("inode->i_size = %lld\n", inode->i_size);
     inode->i_blksize = PAGE_SIZE;
     inode->i_atime.tv_sec = di->i_atime;
@@ -137,6 +137,50 @@ static int lab5fs_write_inode(struct inode * inode, int unused) {
     return 0;
 }
 
+static void lab5fs_delete_inode(struct inode * inode) {
+    unsigned long ino = inode->i_ino;
+    struct buffer_head *bh_inode_block;
+    struct lab5fs_ino * di;
+    int block;
+    int ino_block_index, ino_within_block_index;
+    
+    printk("lab5fs_delete_inode(), ino=%lu\n", ino);
+    
+    if (ino < LAB5FS_ROOT_INO){
+        printk("Bad inode number\n");
+        return;
+    }
+    
+    inode->i_size = 0;
+    inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+    lock_kernel();
+    mark_inode_dirty(inode);
+    
+    // read inode from disk
+    block = 1 + 8 + 1 + 1;
+    ino_block_index = ino / LAB5FS_INO_PER_BLOCK;
+    ino_within_block_index = ino % LAB5FS_INO_PER_BLOCK;
+    printk("ino_block_index = %d, ino_within_block_index = %d\n",
+        ino_block_index, ino_within_block_index);
+
+    bh_inode_block = sb_bread(inode->i_sb, block + ino_block_index);
+    if (!bh_inode_block) {
+        printk("Unable to read inode block\n");
+        unlock_kernel();
+    }
+   
+    // clear and flush to disk
+    di = (struct lab5fs_ino *) (bh_inode_block->b_data);
+    di += ino_within_block_index;
+    memset(di, 0, sizeof(struct lab5fs_ino));
+    mark_buffer_dirty(bh_inode_block);
+    printk("clear d inode and flush to disk\n");
+    brelse(bh_inode_block);
+    
+    unlock_kernel();
+    clear_inode(inode);
+}
+
 static void lab5fs_put_super(struct super_block *s) {
     printk("lab5fs_put_super()\n");
 }
@@ -187,6 +231,7 @@ static struct super_operations lab5fs_sops = {
     .destroy_inode  = lab5fs_destroy_inode,
     .read_inode     = lab5fs_read_inode,
     .write_inode    = lab5fs_write_inode,
+    .delete_inode   = lab5fs_delete_inode,
     .put_super      = lab5fs_put_super,
 };
 
