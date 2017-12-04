@@ -57,8 +57,8 @@ static int lab5fs_readdir(struct file * f, void * dirent, filldir_t filldir) {
         dentry_block_index = dentry_index / LAB5FS_BLOCKSIZE;
         dentry_within_block_index = dentry_index % LAB5FS_DENTRY_PER_BLOCK;
         
-        printk("dentry_index = %d, dentry_block_index = %d, dentry_within_block_index = %d\n", 
-                dentry_index, dentry_block_index, dentry_within_block_index);
+        //printk("dentry_index = %d, dentry_block_index = %d, dentry_within_block_index = %d\n", 
+        //        dentry_index, dentry_block_index, dentry_within_block_index);
         
         bh = sb_bread(dir->i_sb, block + dentry_block_index);
         if (!bh) { 
@@ -66,7 +66,7 @@ static int lab5fs_readdir(struct file * f, void * dirent, filldir_t filldir) {
         }
         dentry_p = (struct lab5fs_dentry *) (bh->b_data);
         dentry_p += dentry_within_block_index;
-        printk("dentry: ino = %u, name = %s\n", dentry_p->ino, dentry_p->name);
+        //printk("dentry: ino = %u, name = %s\n", dentry_p->ino, dentry_p->name);
         
         size = strnlen(dentry_p->name, LAB5FS_NAMELEN);
         if (dentry_p->ino != 0) {
@@ -188,20 +188,23 @@ static int lab5fs_unlink(struct inode * dir, struct dentry * dentry) {
         printk("unlinking non-existent file\n");
     }
 
-    // read inode map from disk and clear bit
-    block = 1 + 8 + 1;
-    bh_inode_map = sb_bread(dir->i_sb, block);
-    if (!bh_inode_map) { 
-        printk("Unable to read inode map\n");
+    if (inode->i_nlink -1 == 0) {
+        // read inode map from disk and clear bit
+        block = 1 + 8 + 1;
+        bh_inode_map = sb_bread(dir->i_sb, block);
+        if (!bh_inode_map) { 
+            printk("Unable to read inode map\n");
+        }
+        inode_map_p = (struct lab5fs_inomap *) (bh_inode_map->b_data);
+        printk("Inode map is %04x\n", *((unsigned int*)inode_map_p));
+        printk("(int)de->ino = %d, de->ino = %zu\n", (int)de->ino, de->ino);
+        clear_bit((int)de->ino, (unsigned long *)inode_map_p);  
+        printk("Inode map now is %04x\n", *((unsigned int*)inode_map_p));
+        // flush inodemap to disk
+        mark_buffer_dirty(bh_inode_map);
+        brelse(bh_inode_map);
+        printk("flush inodemap to disk\n");
     }
-    inode_map_p = (struct lab5fs_inomap *) (bh_inode_map->b_data);
-    printk("Inode map is %04x\n", *((unsigned int*)inode_map_p));
-    clear_bit((int)de->ino, (unsigned long *)inode_map_p);  
-    printk("Inode map now is %04x\n", *((unsigned int*)inode_map_p));
-    // flush inodemap to disk
-    mark_buffer_dirty(bh_inode_map);
-    brelse(bh_inode_map);
-    printk("flush inodemap to disk\n");
     
     // clear dentry bitmap and flush to disk
     dentry_map_p = (struct lab5fs_dentrymap *) (bh_de_map->b_data);
@@ -228,6 +231,28 @@ out_brelse:
     brelse(bh_de_map);
     unlock_kernel();
     return error;
+}
+
+static int lab5fs_link(struct dentry * old, struct inode * dir, struct dentry * new) {
+    struct inode * inode = old->d_inode;
+    int err;
+
+    printk("lab5fs_link(), new->d_name.name = %s, ino = %lu\n", 
+            new->d_name.name, inode->i_ino);
+    
+    lock_kernel();
+    err = lab5fs_add_entry(dir, new->d_name.name, new->d_name.len, inode->i_ino);
+    if (err) {
+        unlock_kernel();
+        return err;
+    }
+    inode->i_nlink++;
+    inode->i_ctime = CURRENT_TIME;
+    mark_inode_dirty(inode);
+    atomic_inc(&inode->i_count);
+    d_instantiate(new, inode);
+    unlock_kernel();
+    return 0;
 }
 
 static struct dentry * lab5fs_lookup(struct inode * dir, struct dentry * dentry, struct nameidata *nd) { 
@@ -269,6 +294,7 @@ struct inode_operations lab5fs_dir_inops = {
     .create         = lab5fs_create,
     .lookup         = lab5fs_lookup,
     .unlink         = lab5fs_unlink,
+    .link           = lab5fs_link,
 };
 
 static int lab5fs_add_entry(struct inode * dir, const char * name, int namelen, int ino) {
@@ -304,8 +330,8 @@ static int lab5fs_add_entry(struct inode * dir, const char * name, int namelen, 
     dentry_block_index = dentry_index / LAB5FS_BLOCKSIZE;
     dentry_within_block_index = dentry_index % LAB5FS_DENTRY_PER_BLOCK;
     
-    printk("dentry_index = %d, dentry_block_index = %d, dentry_within_block_index = %d\n", 
-        dentry_index, dentry_block_index, dentry_within_block_index);
+    //printk("dentry_index = %d, dentry_block_index = %d, dentry_within_block_index = %d\n", 
+    //    dentry_index, dentry_block_index, dentry_within_block_index);
         
     bh = sb_bread(dir->i_sb, block + dentry_block_index);
     if (!bh) { 
@@ -317,7 +343,8 @@ static int lab5fs_add_entry(struct inode * dir, const char * name, int namelen, 
     if (!dentry_p->ino) {
         dir->i_size += LAB5FS_DENTRYSIZE;
         LAB5FS_I(dir)->i_blocknum ++;
-        printk("LAB5FS_I(dir)->i_blocknum = %u\n", LAB5FS_I(dir)->i_blocknum);
+        printk("LAB5FS_I(dir)->i_blocknum = %u, dir->i_size = %llu\n", 
+            LAB5FS_I(dir)->i_blocknum, dir->i_size);
         dir->i_ctime = CURRENT_TIME;
         dir->i_mtime = CURRENT_TIME;
         mark_inode_dirty(dir);
@@ -380,8 +407,8 @@ static struct buffer_head * lab5fs_find_entry(struct inode * dir, const char * n
         dentry_block_index = dentry_index / LAB5FS_BLOCKSIZE;
         dentry_within_block_index = dentry_index % LAB5FS_DENTRY_PER_BLOCK;
         
-        printk("dentry_index = %d, dentry_block_index = %d, dentry_within_block_index = %d\n", 
-                dentry_index, dentry_block_index, dentry_within_block_index);
+        //printk("dentry_index = %d, dentry_block_index = %d, dentry_within_block_index = %d\n", 
+        //        dentry_index, dentry_block_index, dentry_within_block_index);
         
         bh = sb_bread(dir->i_sb, block + dentry_block_index);
         if (!bh) { 
@@ -389,7 +416,7 @@ static struct buffer_head * lab5fs_find_entry(struct inode * dir, const char * n
         }
         dentry_p = (struct lab5fs_dentry *) (bh->b_data);
         dentry_p += dentry_within_block_index;
-        printk("dentry: ino = %u, name = %s\n", dentry_p->ino, dentry_p->name);
+        //printk("dentry: ino = %u, name = %s\n", dentry_p->ino, dentry_p->name);
        
         if (dentry_p->ino && lab5fs_namecmp(namelen, name, dentry_p->name)) {
             *res_dir = dentry_p;

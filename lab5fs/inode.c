@@ -174,7 +174,7 @@ static void lab5fs_delete_inode(struct inode * inode) {
     di += ino_within_block_index;
     memset(di, 0, sizeof(struct lab5fs_ino));
     mark_buffer_dirty(bh_inode_block);
-    printk("clear d inode and flush to disk\n");
+    printk("clear inode and flush to disk\n");
     brelse(bh_inode_block);
     
     unlock_kernel();
