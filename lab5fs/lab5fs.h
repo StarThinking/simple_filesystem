@@ -7,7 +7,7 @@
 #else         
 #define printk(x...)
 #endif
-         
+
 #define LAB5FS_ROOT_INO         2
 #define LAB5FS_NAMELEN          12
 #define LAB5FS_BLOCKSIZE        512
@@ -52,16 +52,16 @@ struct lab5fs_sb {
 
 // inode - 128 bytes
 struct lab5fs_ino {
-    uint32_t i_ino;
+    uint32_t di_ino;
     //uint32_t i_unused;
-    uint32_t i_endoffset;   //offset of the last block
-    uint32_t i_type,i_mode; //16 bytes so far
+    uint32_t di_endsize;   //offset of the last block
+    uint32_t di_type, di_mode; //16 bytes so far
 
-    uint32_t i_uid,i_gid,i_nlink;  
-    uint32_t i_atime,i_mtime,i_ctime;   //40 bytes so far
+    uint32_t di_uid, di_gid, di_nlink;  
+    uint32_t di_atime, di_mtime, di_ctime;   //40 bytes so far
     
-    uint32_t i_blocknum;    //number of data blocks, max = 16
-    uint32_t i_blocks[LAB5FS_DATABLOCK_PER_INO];  //64 bytes, data block numbers
+    uint32_t di_blocknum;    //number of data blocks, max = 16
+    uint32_t di_blocks[LAB5FS_DATABLOCK_PER_INO];  //64 bytes, data block numbers
     
     char i_pad[20];
 };
@@ -90,9 +90,10 @@ struct lab5fs_dentrymap{
  */
 #ifdef __KERNEL__
 struct lab5fs_inode_info {
-    unsigned long i_dsk_ino;
-    uint32_t i_endoffset;
-    //uint32_t i_blocknum;
+    unsigned long bi_dsk_ino;
+    //uint32_t i_endoffset;
+    //uint32_t my_blocknum; // only used by file
+    uint32_t bi_blocks[LAB5FS_DATABLOCK_PER_INO];
     struct inode vfs_inode;
 };
 
@@ -101,9 +102,8 @@ static inline struct lab5fs_inode_info *LAB5FS_I(struct inode *inode) {
 }
 #endif
 
-#define LAB5FS_FILEBLOCKS(ino) (ino->i_blocknum)
-#define D_SIZE(blocknum) (blocknum*LAB5FS_DENTRYSIZE)
-#define LAB5FS_FILESIZE(ino) (ino->i_blocknum == 0? 0 : (ino->i_blocknum-1)*LAB5FS_BLOCKSIZE + ino->i_endoffset + 1)
+#define D_SIZE(inode) (inode->i_blocks * LAB5FS_DENTRYSIZE)
+#define LAB5FS_FILESIZE(di) (di->di_blocknum == 0? 0 : (di->di_blocknum-1)*LAB5FS_BLOCKSIZE + di->di_endsize)
 
 /* file.c */
 extern struct inode_operations lab5fs_file_inops;

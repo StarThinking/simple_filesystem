@@ -28,6 +28,7 @@ int main(int argc, char **argv){
     time_t now;
     int c,i,len;
     struct stat buf;
+    int _i;
     
     if (argc != 2) {
         printf("need TWO arguments!\n");
@@ -131,20 +132,24 @@ int main(int argc, char **argv){
             return;
         }
         // root inode info
-        ri.i_ino = LAB5FS_ROOT_INO;
+        ri.di_ino = LAB5FS_ROOT_INO;
         //ri.i_first_block = 1 + ino_blocks;
         //ri.i_last_block  = ri.i_first_block + (ino_nums*sizeof(de)-1)/LAB5FS_BLOCKSIZE;
-        ri.i_endoffset = 2*sizeof(de)-1;
-        ri.i_type = LAB5FS_DIR_TYPE;
-        ri.i_mode = S_IFDIR | 0755;
+        //ri.di_endsize = 2*sizeof(de)-1;
+        ri.di_endsize = 0;
+        ri.di_type = LAB5FS_DIR_TYPE;
+        ri.di_mode = S_IFDIR | 0755;
         //ri.i_uid = ri.i_gid = 1;
-        ri.i_nlink = 2;
-        ri.i_blocknum = 2;
-        ri.i_uid = 0;
-        ri.i_gid = 0;
+        ri.di_nlink = 2;
+        ri.di_blocknum = 2;
+        ri.di_uid = 0;
+        ri.di_gid = 0;
         time(&now);
-        ri.i_atime = ri.i_mtime = ri.i_ctime = now;
-        printf("i_ino: %d, i_type: %d, i_mode: %x, i_gid: %d, i_nlink: %d, i_blocknum: %d, i_atime: %d\n", ri.i_ino, ri.i_type, ri.i_mode, ri.i_gid, ri.i_nlink, ri.i_blocknum, ri.i_atime);
+        //memset(ri.di_blocks, 0, sizeof(LAB5FS_DATABLOCK_PER_INO));
+        for (_i=0; _i<LAB5FS_DENTRYSIZE; _i ++) {
+        }
+        ri.di_atime = ri.di_mtime = ri.di_ctime = now;
+        //printf("i_ino: %d, i_type: %d, i_mode: %x, i_gid: %d, i_nlink: %d, i_blocknum: %d, i_atime: %d\n", ri.i_ino, ri.i_type, ri.i_mode, ri.i_gid, ri.i_nlink, ri.i_blocknum, ri.i_atime);
         
         if (write(fd, &ri, sizeof(ri)) != sizeof(ri)){
             printf("error writing root inode\n");

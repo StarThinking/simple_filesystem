@@ -16,6 +16,7 @@ static void lab5fs_read_inode(struct inode * inode) {
     struct lab5fs_ino *di, ri;
     struct buffer_head *bh;
     int block, off;
+    int i = 0;
     
     printk("lab5fs_read_inode(), ino = %d\n", ino);
     
@@ -41,13 +42,13 @@ static void lab5fs_read_inode(struct inode * inode) {
     ri = *di;
     //printk("i_ino: %d, i_type: %d, i_mode: %x, i_gid: %d, i_nlink: %d, i_blocknum: %d, i_atime: %d\n", ri.i_ino, ri.i_type, ri.i_mode, ri.i_gid, ri.i_nlink, ri.i_blocknum, ri.i_atime);
     
-    inode->i_mode = 0x0000ffff & di->i_mode;
-    if (di->i_type == LAB5FS_DIR_TYPE) {
+    inode->i_mode = 0x0000ffff & di->di_mode;
+    if (di->di_type == LAB5FS_DIR_TYPE) {
         printk("LAB5FS_DIR_TYPE\n");
         inode->i_mode |= S_IFDIR;
         inode->i_op = &lab5fs_dir_inops;
         inode->i_fop = &lab5fs_dir_operations;
-    } else if (di->i_type == LAB5FS_REG_TYPE) {
+    } else if (di->di_type == LAB5FS_REG_TYPE) {
         printk("LAB5FS_REG_TYPE\n");
         inode->i_mode |= S_IFREG;
         inode->i_op = &lab5fs_file_inops;
@@ -59,29 +60,36 @@ static void lab5fs_read_inode(struct inode * inode) {
         goto out;
     }
     
-    inode->i_uid = di->i_uid;
-    inode->i_gid = di->i_gid;
-    inode->i_nlink = di->i_nlink;
-    inode->i_blocks = LAB5FS_FILEBLOCKS(di);
+    inode->i_uid = di->di_uid;
+    inode->i_gid = di->di_gid;
+    inode->i_nlink = di->di_nlink;
+    //inode->i_blocks = LAB5FS_FILEBLOCKS(di);
     if (ino != LAB5FS_ROOT_INO)
         inode->i_size = LAB5FS_FILESIZE(di);
     else
         inode->i_size = 4096; // for . 
-    printk("inode->i_size = %lld\n", inode->i_size);
     inode->i_blksize = PAGE_SIZE;
-    inode->i_atime.tv_sec = di->i_atime;
-    inode->i_mtime.tv_sec = di->i_mtime;
-    inode->i_ctime.tv_sec = di->i_ctime;
+    inode->i_atime.tv_sec = di->di_atime;
+    inode->i_mtime.tv_sec = di->di_mtime;
+    inode->i_ctime.tv_sec = di->di_ctime;
     inode->i_atime.tv_nsec = 0;
     inode->i_mtime.tv_nsec = 0;
     inode->i_ctime.tv_nsec = 0;
-    LAB5FS_I(inode)->i_dsk_ino = di->i_ino;
-    LAB5FS_I(inode)->i_endoffset = di->i_endoffset;
-    inode->i_blocks = di->i_blocknum;
-    printk("inode->i_blocks = %zu\n", inode->i_blocks);
+    LAB5FS_I(inode)->bi_dsk_ino = di->di_ino;
+    memcpy(LAB5FS_I(inode)->bi_blocks, di->di_blocks, sizeof(uint32_t)*LAB5FS_DATABLOCK_PER_INO);
+    inode->i_blocks = di->di_blocknum;
     
+    mark_inode_dirty(inode);
+    printk("after read: ino = %d, inode->i_size = %lld\n", ino, inode->i_size);
+    printk("inode->i_blocks = %lu, inode->i_size = %llu\n", inode->i_blocks, inode->i_size);
+   
+    for(i=0; i<=15; i++) {
+        printk("LAB5FS_I(inode)->bi_blocks[%d] = %u ", i, LAB5FS_I(inode)->bi_blocks[i]);
+        printk("\n");
+    }
 out:
     brelse(bh);
+    printk("\n");
 }
 
 static int lab5fs_write_inode(struct inode * inode, int unused) {
@@ -113,27 +121,38 @@ static int lab5fs_write_inode(struct inode * inode, int unused) {
     di += ino_within_block_index;
 
     if (inode->i_ino == LAB5FS_ROOT_INO)
-        di->i_type = LAB5FS_DIR_TYPE;
+        di->di_type = LAB5FS_DIR_TYPE;
     else
-        di->i_type = LAB5FS_REG_TYPE;
+        di->di_type = LAB5FS_REG_TYPE;
     
-    di->i_ino = inode->i_ino;
-    di->i_mode = inode->i_mode;
-    di->i_uid = inode->i_uid;
-    di->i_gid = inode->i_gid;
-    di->i_nlink = inode->i_nlink;
-    di->i_atime = inode->i_atime.tv_sec;
-    di->i_mtime = inode->i_mtime.tv_sec;
-    di->i_ctime = inode->i_ctime.tv_sec;
-    di->i_endoffset = LAB5FS_I(inode)->i_endoffset;
-    di->i_blocknum = inode->i_blocks;
+    di->di_ino = inode->i_ino;
+    di->di_mode = inode->i_mode;
+    di->di_uid = inode->i_uid;
+    di->di_gid = inode->i_gid;
+    di->di_nlink = inode->i_nlink;
+    di->di_atime = inode->i_atime.tv_sec;
+    di->di_mtime = inode->i_mtime.tv_sec;
+    di->di_ctime = inode->i_ctime.tv_sec;
+    
+    if (di->di_ino != LAB5FS_ROOT_INO) {
+        printk("inode->i_size = %llu\n", inode->i_size);
+        di->di_endsize = (inode->i_size == 0) ? 0 : (inode->i_size % LAB5FS_BLOCKSIZE);
+        di->di_blocknum = (inode->i_size == 0) ? 0 : (inode->i_size / LAB5FS_BLOCKSIZE) + 1;
+    } else {
+        di->di_endsize = 0; // not matter
+        di->di_blocknum = inode->i_blocks;
+    }
 
-    printk("di->i_blocknum = %u\n", di->i_blocknum);
+    memcpy(di->di_blocks, LAB5FS_I(inode)->bi_blocks, sizeof(uint32_t)*LAB5FS_DATABLOCK_PER_INO);
+
+    printk("di->di_blocknum = %u, di->di_endsize = %u\n",
+        di->di_blocknum, di->di_endsize);
     // flush inode to disk
     mark_buffer_dirty(bh_inode_block);
     brelse(bh_inode_block);
     printk("flush inode to disk\n");
     unlock_kernel();
+    printk("\n");
     return 0;
 }
 
@@ -144,12 +163,45 @@ static void lab5fs_delete_inode(struct inode * inode) {
     int block;
     int ino_block_index, ino_within_block_index;
     
+    struct buffer_head * bh_data_map, *bh_data_block;
+    struct lab5fs_datamap * data_map_p;
+    int i;
+    int block_data_start = 1 + 8 + 1 + 1 + 256 + 32; // 299
+    void *data_block;
+    
     printk("lab5fs_delete_inode(), ino=%lu\n", ino);
     
     if (ino < LAB5FS_ROOT_INO){
         printk("Bad inode number\n");
         return;
     }
+    
+    // clear data and data bitmap
+    block = 1;
+    bh_data_map = sb_bread(inode->i_sb, block);
+    if (!bh_data_map) {
+        printk("Unable to read data map\n");
+    }
+    data_map_p = (struct lab5fs_datamap *) (bh_data_map->b_data);
+    
+    for (i=0; i<LAB5FS_DATABLOCK_PER_INO; i++) {
+        //printk("LAB5FS_I(inode)->bi_blocks[%d] = %d\n", i, (int)(LAB5FS_I(inode)->bi_blocks[i]));
+        if (LAB5FS_I(inode)->bi_blocks[i] > 0) {
+            printk("LAB5FS_I(inode)->bi_blocks[%d] = %d\n", i, (int)(LAB5FS_I(inode)->bi_blocks[i]));
+            int index = (int)(LAB5FS_I(inode)->bi_blocks[i]) - block_data_start;
+            printk("clear data bitmap at %d bit\n", index);
+            clear_bit(index, data_map_p);
+            mark_buffer_dirty(bh_data_map);
+
+            bh_data_block = sb_bread(inode->i_sb, block_data_start + index);
+            data_block = (void *) bh_data_block->b_data;
+            memset(data_block, 0, LAB5FS_BLOCKSIZE);
+            printk("clear data block %d\n", index + block_data_start);
+            mark_buffer_dirty(bh_data_block);
+            brelse(bh_data_block);
+        }
+    }
+    brelse(bh_data_map);
     
     inode->i_size = 0;
     inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
@@ -179,6 +231,8 @@ static void lab5fs_delete_inode(struct inode * inode) {
     
     unlock_kernel();
     clear_inode(inode);
+
+    printk("\n");
 }
 
 static void lab5fs_put_super(struct super_block *s) {
@@ -192,6 +246,10 @@ static struct inode *lab5fs_alloc_inode(struct super_block *sb) {
     
     printk("lab5fs_alloc_inode()\n");
     bi = kmem_cache_alloc(lab5fs_inode_cachep, SLAB_KERNEL);
+    memset(bi->bi_blocks, 0, sizeof(uint32_t)*LAB5FS_DATABLOCK_PER_INO);
+    //bi->i_blocknum = 0;
+    //bi->i_endoffset = 0;
+    printk("\n");
     if (!bi)
         return NULL;
     return &bi->vfs_inode;
@@ -224,6 +282,7 @@ static void destroy_inodecache(void) {
     printk("destroy_inodecache()\n");
     if (kmem_cache_destroy(lab5fs_inode_cachep))
         printk(KERN_INFO "lab5fs_inode_cache: not all structures were freed\n");
+    printk("\n");
 }
 
 static struct super_operations lab5fs_sops = {
@@ -240,6 +299,7 @@ static int lab5fs_fill_super(struct super_block *s, void *data, int silent){
     struct lab5fs_sb *mem_sb;
     struct inode *inode;
 
+    printk("lab5fs_fill_super()\n");
     sb_set_blocksize(s, LAB5FS_BLOCKSIZE);
 
     bh = sb_bread(s, 0);
@@ -271,12 +331,14 @@ static int lab5fs_fill_super(struct super_block *s, void *data, int silent){
         goto out;
     }
     printk("d_alloc_root finished\n");
+    printk("\n");
     
     return 0; 
 
 out:
     printk("something is wrong in fill_super\n");
     brelse(bh);
+    printk("\n");
     return -EINVAL;
 }
 
