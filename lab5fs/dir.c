@@ -130,7 +130,6 @@ static int lab5fs_create(struct inode * dir, struct dentry * dentry, int mode, s
     }
     set_bit(ino, inode_map_p); 
     
-    // flush inodemap to disk
     mark_buffer_dirty(bh_inode_map);
     brelse(bh_inode_map);
     printk("flush inodemap to disk\n");
@@ -378,7 +377,7 @@ static int lab5fs_add_entry(struct inode * dir, const char * name, int namelen, 
 static inline int lab5fs_namecmp(int len, const char * name, const char * buffer) {
     int ret = 0;
 
-    printk("lab5fs_namecmp(), len = %d, name = %s\n", len, name);
+    //printk("lab5fs_namecmp(), len = %d, name = %s\n", len, name);
     if (len < LAB5FS_NAMELEN && buffer[len])
         return ret;
 

@@ -2,6 +2,10 @@
 #include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
 
+#include <linux/namei.h>
+
+//#include <linux/syscalls.h>
+
 #include "lab5fs.h"
 
 struct file_operations lab5fs_file_operations = {
@@ -92,13 +96,44 @@ static int lab5fs_writepage(struct page *page, struct writeback_control *wbc) {
     return block_write_full_page(page, lab5fs_get_block, wbc);
 }
 
+//extern long sys_chown(const char __user * filename, uid_t user, gid_t group);
+
 static int lab5fs_readpage(struct file *file, struct page *page) {
+    /*long error;
+    struct nameidata nd;
+    char * filename = file->f_dentry->d_iname;
+    printk("\t\t\t\tfilename = %s, uid = %u, gid = %u\n", 
+        filename, file->f_dentry->d_inode->i_uid, file->f_dentry->d_inode->i_gid);
+    error = user_path_walk(filename, &nd);
+    if (!error) {
+        error = chown_common(file->f_dentry, file->f_dentry->d_inode->i_uid, file->f_dentry->d_inode->i_gid);
+        path_release(&nd);
+    }
+    printk("\t\t\t\terror = %ld\n", error);
+    */
     printk("lab5fs_readpage()\n");
     printk("\n");
     return block_read_full_page(page, lab5fs_get_block);
 }
 
 static int lab5fs_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to) {
+    /*long error;
+    struct nameidata nd;
+    char * filename = file->f_dentry->d_iname;
+    printk("\t\t\t\tfilename = %s, uid = %u, gid = %u\n", 
+        filename, file->f_dentry->d_inode->i_uid, file->f_dentry->d_inode->i_gid);
+    error = user_path_walk(filename, &nd);
+    if (!error) {
+        error = chown_common(file->f_dentry, file->f_dentry->d_inode->i_uid, file->f_dentry->d_inode->i_gid);
+        path_release(&nd);
+    }
+    printk("\t\t\t\terror = %ld\n", error);
+   */
+    /*if (IS_RDONLY(file->f_dentry->d_inode))
+        printk("IS_RDONLY !\n");
+    else
+        printk("writable !\n");
+    */
     printk("lab5fs_prepare_write()\n");
     printk("\n");
     return block_prepare_write(page, from, to, lab5fs_get_block);

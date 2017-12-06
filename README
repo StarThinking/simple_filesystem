@@ -1,11 +1,15 @@
-1. files included:
-	- README: 	description of overall design and implementation
-	- lab5fs.h: 	header file, which declares basic constants/structs of lab5fs
-	- lab5fs.c: 	implementation of lab5fs file system kernel module
-	- mklab5fs.c:	mkfs utility of lab5fs
-	- Makefile:	Makefile for creating lab5fs.ko and mklab5fs
+Authors:
+Sixiang Ma      ma.1189@osu.edu
+Xiaokuan Zhang  zhang.5840@osu.edu 
 
-1. file system on-disk layout (mklab5fs.c)
+1. Files included:
+    - README:               description of overall design and implementation
+    - lab5fs.h: 	    header file, which declares basic constants/structs of lab5fs
+    - inode.c dir.c file.c  implementation of lab5fs file system kernel module
+    - mklab5fs.c:	    mkfs utility of lab5fs
+    - Makefile:	            Makefile for creating lab5fs.ko and mklab5fs
+
+1. File system on-disk layout (mklab5fs.c)
 -----------------------------------------------
 |	        super block (1 block)          |
 -----------------------------------------------
@@ -47,7 +51,7 @@
 |                                              |
 -----------------------------------------------
 
-1. limitations:
+1. Limitations:
 	- image file size: 		1 MB ~ 16 MB
 	- max number of inodes: 	1024
 	- max number of files:		1024
@@ -57,14 +61,32 @@
 	- data block number:		1749 ~ 32469
 
 
+2. System description:
+    
+    Lab5fs is a file system which implements most VFS primitives except that it only contains one directory, which is the directory mounted. In addition to the user-space mkfs application, according to the functionality, the implementation of lab5fs can be divided into three parts: inode, directory, and file. 
+    
+    1. The part of inode is responsible for:
+        a. reading inode from disk to fill VFS inode;
+        b. writing VFS inode and also auxiliary in-memory data structure (used to record block ids) to disk;
+        c. deleting inode in VFS as well as in disk;
+        d. maintaining inode bitmap in disk.
+    
+    2. The part of dir is responsible for:
+        a. adding dentry into VFS and flush into disk;
+        b. finding the corresponding dentry by name;
+        c. deleting dentry in VFS as well as in disk; 
+        d. maintaining dentry bitmap in disk.
+    
+    3. The part of file is responsible for:
+        a. mapping between a block for a file to a block in disk.
+        b. maintaining block bitmap in disk.
 
+    To accomplish some file operations, the system functions in multiple parts could be used together. For example, to create a new (empty) file, both 2.ad and 1.bd are needed. And, to write into a file, both 3.ab and 1.b are needed.
+    
+2. Bugs unsolved:
+    
+    The file system can only displays at most 100 files on the terminal, even though a user can create 1000 files correctly. Fundamentally, I guess this is not a bug but some configuration issues.
 
-
-
-
-
-
-
-
-
+2. Unimplemented features:
+    Permission is not implemented yet due to time limitation and our preference to solve bugs so as to make basic file system related functions work correctly and smoothly. 
 
